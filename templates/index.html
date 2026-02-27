@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sillage — Perfume Recommender</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg:      #0f0d0a;
+  --surface: #181410;
+  --card:    #1f1a13;
+  --card-hi: #262018;
+  --gold:    #c8a45a;
+  --gold-hi: #e0bb78;
+  --gold-lo: #7a5f2a;
+  --text:    #ede5d4;
+  --mid:     #a8966e;
+  --dim:     #5a4f38;
+  --border:  rgba(200,164,90,.16);
+  --border-hi: rgba(200,164,90,.4);
+  --chip-on: rgba(200,164,90,.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.ambient {
+  position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+  background: radial-gradient(circle, rgba(200,164,90,.055) 0%, transparent 70%);
+}
+.a1 { width: 900px; height: 900px; top: -350px; right: -300px; }
+.a2 { width: 600px; height: 600px; bottom: -200px; left: -200px; }
+
+/* Topbar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(15,13,10,.88);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 56px;
+}
+.topbar-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; font-style: italic; color: var(--gold);
+}
+.topbar-meta { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+
+/* Hero */
+.hero {
+  position: relative; z-index: 1;
+  text-align: center; padding: 80px 40px 68px;
+  border-bottom: 1px solid var(--border);
+}
+.hero-pre {
+  font-size: 11px; letter-spacing: .38em; text-transform: uppercase; color: var(--gold);
+  margin-bottom: 22px; opacity: 0; animation: up .7s .1s forwards;
+}
+.hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(52px, 8vw, 96px); font-weight: 400;
+  line-height: .95; letter-spacing: -.01em; color: var(--text);
+  opacity: 0; animation: up .7s .2s forwards;
+}
+.hero-title em { color: var(--gold); font-style: italic; }
+.hero-sub {
+  max-width: 540px; margin: 24px auto 0;
+  font-size: 16px; color: var(--mid); line-height: 1.7;
+  opacity: 0; animation: up .7s .35s forwards;
+}
+.hero-stats {
+  display: flex; justify-content: center; gap: 52px; flex-wrap: wrap;
+  margin-top: 48px; opacity: 0; animation: up .7s .5s forwards;
+}
+.hs-n { display: block; font-family: 'Playfair Display', serif; font-size: 38px; font-weight: 400; color: var(--gold); line-height: 1; }
+.hs-l { display: block; margin-top: 6px; font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+
+@keyframes up { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+
+/* Main */
+main { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 64px 32px 120px; }
+
+.step-block { margin-bottom: 56px; }
+.step-head  { display: flex; align-items: baseline; gap: 16px; margin-bottom: 10px; }
+.step-num   { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-lo); }
+.step-title { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 400; color: var(--text); }
+.step-desc  { font-size: 15px; color: var(--mid); margin-bottom: 24px; line-height: 1.6; }
+
+hr.div { border: none; border-top: 1px solid var(--border); margin: 52px 0; }
+
+/* Gender */
+.gender-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.g-btn {
+  padding: 10px 26px; border: 1px solid var(--border); background: transparent;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 300;
+  color: var(--mid); cursor: pointer; transition: all .18s;
+}
+.g-btn:hover { border-color: var(--border-hi); color: var(--text); }
+.g-btn.on { background: var(--chip-on); border-color: var(--gold); color: var(--gold-hi); }
+
+/* Brand combobox */
+.brand-box { position: relative; }
+.brand-search-wrap {
+  position: relative; border: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center;
+  transition: border-color .18s;
+}
+.brand-search-wrap:focus-within { border-color: var(--border-hi); }
+.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--dim); font-size: 16px; pointer-events: none; }
+#brandSearch {
+  width: 100%; padding: 13px 14px 13px 40px;
+  background: transparent; border: none; outline: none;
+  font-family: 'Inter', sans-serif; font-size: 15px; color: var(--text);
+}
+#brandSearch::placeholder { color: var(--dim); }
+
+.brand-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20;
+  background: var(--card); border: 1px solid var(--border);
+  max-height: 240px; overflow-y: auto; display: none;
+}
+.brand-dropdown.open { display: block; }
+.brand-option {
+  padding: 11px 16px; font-size: 14px; color: var(--mid);
+  cursor: pointer; transition: background .12s, color .12s;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.brand-option:hover { background: var(--card-hi); color: var(--text); }
+.brand-option.selected { color: var(--gold); }
+.brand-option.selected::after { content: '✓'; font-size: 12px; }
+.brand-dropdown::-webkit-scrollbar { width: 4px; }
+.brand-dropdown::-webkit-scrollbar-thumb { background: var(--dim); }
+
+.selected-brands { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.brand-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px; background: var(--chip-on);
+  border: 1px solid rgba(200,164,90,.28); font-size: 13px; color: var(--gold);
+}
+.brand-tag button {
+  background: none; border: none; color: var(--gold-lo);
+  cursor: pointer; font-size: 15px; line-height: 1; padding: 0;
+  transition: color .15s;
+}
+.brand-tag button:hover { color: var(--gold); }
+
+/* Note chips */
+.note-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 32px; }
+.note-col h3 {
+  font-size: 10px; letter-spacing: .25em; text-transform: uppercase; color: var(--gold-lo);
+  margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 7px 16px; border: 1px solid var(--border); background: transparent;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 300;
+  color: var(--mid); cursor: pointer; transition: all .15s;
+}
+.chip:hover { border-color: var(--border-hi); color: var(--text); }
+.chip.on { background: var(--chip-on); border-color: var(--gold); color: var(--gold-hi); font-weight: 400; }
+.tally { margin-top: 14px; font-size: 14px; color: var(--gold); min-height: 20px; }
+
+/* CTA */
+.cta { text-align: center; }
+.btn-go {
+  display: inline-block; padding: 18px 72px;
+  border: 1px solid var(--gold); background: transparent;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+  letter-spacing: .35em; text-transform: uppercase; color: var(--gold);
+  cursor: pointer; position: relative; overflow: hidden; transition: color .28s;
+}
+.btn-go::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .28s ease;
+}
+.btn-go:hover::before { transform: scaleX(1); }
+.btn-go:hover { color: #0f0d0a; }
+.btn-go span { position: relative; z-index: 1; }
+.btn-go:disabled { opacity: .35; cursor: not-allowed; }
+.btn-go:disabled::before { display: none; }
+.btn-go:disabled { color: var(--gold); }
+
+/* Loading */
+#loading { display: none; text-align: center; padding: 56px; }
+.spinner { display: inline-block; width: 28px; height: 28px; border: 1px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-txt { margin-top: 18px; font-size: 13px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+
+/* Results */
+#results { display: none; }
+.res-title { font-family: 'Playfair Display', serif; font-size: 40px; font-weight: 400; margin-bottom: 8px; }
+.res-sub { font-size: 14px; color: var(--mid); margin-bottom: 36px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+/* Card — anchor tag, fully clickable */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  padding: 26px 24px; display: block;
+  text-decoration: none; color: inherit;
+  position: relative; overflow: hidden;
+  transition: border-color .2s, background .2s, transform .2s;
+  opacity: 0; transform: translateY(16px); animation: up .4s forwards;
+}
+.card:hover { border-color: rgba(200,164,90,.42); background: var(--card-hi); transform: translateY(-2px); }
+.card::before { content: ''; position: absolute; top: 0; left: 0; width: 2px; height: 0; background: var(--gold); transition: height .3s; }
+.card:hover::before { height: 100%; }
+/* Open-in-new indicator */
+.card::after {
+  content: '↗'; position: absolute; top: 16px; right: 16px;
+  font-size: 13px; color: var(--dim); transition: color .2s, transform .2s;
+}
+.card:hover::after { color: var(--gold); transform: translate(2px,-2px); }
+
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.card-badge { font-size: 10px; letter-spacing: .26em; text-transform: uppercase; color: var(--gold); }
+.card-rating { font-size: 14px; color: var(--mid); }
+.card-rating strong { color: var(--text); font-weight: 400; }
+.card-name { font-family: 'Playfair Display', serif; font-size: 20px; line-height: 1.2; margin-bottom: 3px; }
+.card-brand { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: 16px; }
+
+.note-tier { margin-bottom: 9px; }
+.tier-l { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+.note-list { font-size: 13px; color: var(--mid); line-height: 1.55; }
+.note-list .hit { color: var(--gold-hi); font-weight: 500; }
+
+.score-row { margin-top: 20px; }
+.score-bar { height: 1px; background: rgba(200,164,90,.1); overflow: hidden; }
+.score-fill { height: 100%; background: linear-gradient(to right, var(--gold-lo), var(--gold)); width: 0; transition: width 1s ease .2s; }
+.score-foot { display: flex; justify-content: space-between; margin-top: 7px; }
+.score-pct { font-size: 13px; font-style: italic; color: var(--mid); }
+.score-revs { font-size: 12px; color: var(--dim); }
+
+/* How it works */
+.how { margin-top: 72px; }
+.how-title { font-family: 'Playfair Display', serif; font-size: 28px; font-style: italic; color: var(--mid); margin-bottom: 32px; }
+.pipeline { border-left: 2px solid var(--border); padding-left: 32px; }
+.pipe-step { display: flex; gap: 20px; padding: 16px 0; border-bottom: 1px solid rgba(200,164,90,.06); }
+.pipe-step:last-child { border-bottom: none; }
+.pipe-n { font-size: 10px; letter-spacing: .14em; color: var(--gold-lo); min-width: 22px; padding-top: 3px; }
+.pipe-body { font-size: 15px; color: var(--mid); line-height: 1.7; }
+.pipe-body strong { color: var(--text); font-weight: 400; }
+.pipe-body code { font-size: 13px; color: var(--gold); background: rgba(200,164,90,.08); padding: 1px 7px; }
+
+</style>
+</head>
+<body>
+
+<div class="ambient a1"></div>
+<div class="ambient a2"></div>
+
+<div class="topbar">
+  <span class="topbar-logo">Sillage</span>
+  <span class="topbar-meta">{{ "{:,}".format(total_perfumes) }} perfumes · Fragrantica</span>
+</div>
+
+<header class="hero">
+  <p class="hero-pre">A data science learning project</p>
+  <h1 class="hero-title">Find your <em>signature</em> scent</h1>
+  <p class="hero-sub">
+    Select notes you love. A cosine similarity algorithm searches
+    {{ "{:,}".format(total_perfumes) }} real perfumes and surfaces the closest matches.
+  </p>
+  <div class="hero-stats">
+    <div>
+      <span class="hs-n">{{ "{:,}".format(total_perfumes) }}</span>
+      <span class="hs-l">Real Perfumes</span>
+    </div>
+    <div>
+      <span class="hs-n">{{ feature_dims }}</span>
+      <span class="hs-l">Note Features</span>
+    </div>
+    <div>
+      <span class="hs-n">cos&thinsp;&theta;</span>
+      <span class="hs-l">Similarity Metric</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- 01 GENDER -->
+  <div class="step-block">
+    <div class="step-head">
+      <span class="step-num">01</span>
+      <span class="step-title">Gender</span>
+    </div>
+    <p class="step-desc">Optional — leave on "All" to search across every category.</p>
+    <div class="gender-row">
+      <button class="g-btn on" data-g="">All</button>
+      <button class="g-btn" data-g="women">Women</button>
+      <button class="g-btn" data-g="men">Men</button>
+      <button class="g-btn" data-g="unisex">Unisex</button>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <!-- 02 BRANDS -->
+  <div class="step-block">
+    <div class="step-head">
+      <span class="step-num">02</span>
+      <span class="step-title">Maisons</span>
+    </div>
+    <p class="step-desc">Optional — filter to one or more specific perfume houses.</p>
+    <div class="brand-box">
+      <div class="brand-search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="brandSearch" placeholder="Search brands — e.g. Dior, Chanel, Guerlain…" autocomplete="off">
+      </div>
+      <div class="brand-dropdown" id="brandDropdown">
+        {% for brand in brands %}
+        <div class="brand-option" data-brand="{{ brand }}">{{ brand }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="selected-brands" id="selectedBrands"></div>
+  </div>
+
+  <hr class="div">
+
+  <!-- 03 NOTES -->
+  <div class="step-block">
+    <div class="step-head">
+      <span class="step-num">03</span>
+      <span class="step-title">Notes</span>
+    </div>
+    <p class="step-desc">Select the ingredients that draw you in. Matched notes will be highlighted on results.</p>
+    <div class="note-columns" id="noteCols">
+      <p style="color:var(--dim)">Loading…</p>
+    </div>
+    <p class="tally" id="tally"></p>
+  </div>
+
+  <hr class="div">
+
+  <div class="cta">
+    <button class="btn-go" id="goBtn"><span>Find My Scent</span></button>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p class="loading-txt">Running cosine similarity across {{ "{:,}".format(total_perfumes) }} perfumes…</p>
+  </div>
+
+  <div id="results">
+    <h2 class="res-title">Your matches</h2>
+    <p class="res-sub" id="resSub"></p>
+    <div class="grid" id="grid"></div>
+
+    <div class="how">
+      <p class="how-title">How this recommendation works</p>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <span class="pipe-n">01</span>
+          <div class="pipe-body">
+            <strong>Load the data</strong> — <code>pandas.read_csv()</code> loads {{ "{:,}".format(total_perfumes) }} real Fragrantica perfumes. Each row is one perfume with its notes, brand, gender, and rating.
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-n">02</span>
+          <div class="pipe-body">
+            <strong>Encode the notes</strong> — <code>MultiLabelBinarizer</code> turns each perfume's notes list into a row of {{ feature_dims }} zeros and ones — one column per unique note in the dataset. Present&nbsp;=&nbsp;1, absent&nbsp;=&nbsp;0.
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-n">03</span>
+          <div class="pipe-body">
+            <strong>Encode your preferences</strong> — Your selected notes become a vector in the same {{ feature_dims }}-dimensional space. Now both the perfumes and your preferences are purely numeric.
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-n">04</span>
+          <div class="pipe-body">
+            <strong>Cosine similarity</strong> — <code>sklearn</code> computes the angle θ between your vector and every perfume's vector. A score near 1.0 means very similar note profiles; 0.0 means nothing in common. The top 8 are returned.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+let selectedGender = "";
+let selectedBrands = new Set();
+let selectedNotes  = new Set();
+
+// Gender
+document.querySelectorAll('.g-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.g-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    selectedGender = btn.dataset.g;
+  });
+});
+
+// Brand combobox
+const brandSearch   = document.getElementById('brandSearch');
+const brandDropdown = document.getElementById('brandDropdown');
+const allOptions    = [...document.querySelectorAll('.brand-option')];
+
+brandSearch.addEventListener('focus', () => brandDropdown.classList.add('open'));
+brandSearch.addEventListener('blur',  () => setTimeout(() => brandDropdown.classList.remove('open'), 160));
+brandSearch.addEventListener('input', () => {
+  const q = brandSearch.value.toLowerCase();
+  allOptions.forEach(o => o.style.display = o.dataset.brand.toLowerCase().includes(q) ? '' : 'none');
+});
+
+allOptions.forEach(opt => {
+  opt.addEventListener('click', () => {
+    const brand = opt.dataset.brand;
+    if (selectedBrands.has(brand)) {
+      selectedBrands.delete(brand);
+      opt.classList.remove('selected');
+    } else {
+      selectedBrands.add(brand);
+      opt.classList.add('selected');
+    }
+    brandSearch.value = '';
+    allOptions.forEach(o => o.style.display = '');
+    renderTags();
+  });
+});
+
+function renderTags() {
+  const c = document.getElementById('selectedBrands');
+  c.innerHTML = '';
+  selectedBrands.forEach(brand => {
+    const tag = document.createElement('div');
+    tag.className = 'brand-tag';
+    tag.innerHTML = `${brand}<button data-b="${brand}" title="Remove">×</button>`;
+    tag.querySelector('button').addEventListener('click', () => {
+      selectedBrands.delete(brand);
+      allOptions.find(o => o.dataset.brand === brand)?.classList.remove('selected');
+      renderTags();
+    });
+    c.appendChild(tag);
+  });
+}
+
+// Notes
+fetch('/api/notes')
+  .then(r => r.json())
+  .then(data => {
+    const container = document.getElementById('noteCols');
+    container.innerHTML = '';
+    [
+      { label: 'Top Notes',   notes: data.top  },
+      { label: 'Heart Notes', notes: data.mid  },
+      { label: 'Base Notes',  notes: data.base },
+    ].forEach(tier => {
+      const col = document.createElement('div');
+      col.className = 'note-col';
+      col.innerHTML = `<h3>${tier.label}</h3><div class="chips">${
+        tier.notes.map(n => `<button class="chip" data-note="${n}">${n}</button>`).join('')
+      }</div>`;
+      container.appendChild(col);
+    });
+    container.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n = btn.dataset.note;
+        if (selectedNotes.has(n)) { selectedNotes.delete(n); btn.classList.remove('on'); }
+        else                       { selectedNotes.add(n);    btn.classList.add('on'); }
+        const cnt = selectedNotes.size;
+        document.getElementById('tally').textContent = cnt ? `${cnt} note${cnt>1?'s':''} selected` : '';
+      });
+    });
+  });
+
+// Submit
+document.getElementById('goBtn').addEventListener('click', async () => {
+  if (!selectedNotes.size) { alert('Please select at least one note.'); return; }
+  const btn = document.getElementById('goBtn');
+  btn.disabled = true;
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('loading').style.display  = 'block';
+  try {
+    const res  = await fetch('/api/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notes:  [...selectedNotes],
+        gender: selectedGender || null,
+        brands: selectedBrands.size ? [...selectedBrands] : null,
+      }),
+    });
+    showResults((await res.json()).results);
+  } catch(e) { alert('Server error. Is Flask running?'); }
+  finally { document.getElementById('loading').style.display = 'none'; btn.disabled = false; }
+});
+
+function showResults(results) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  const parts = [`Notes: ${[...selectedNotes].join(', ')}`];
+  if (selectedGender) parts.push(selectedGender);
+  if (selectedBrands.size) parts.push([...selectedBrands].join(', '));
+  document.getElementById('resSub').textContent = parts.join(' · ');
+
+  if (!results.length) {
+    grid.innerHTML = '<p style="color:var(--mid);font-size:15px;padding:24px 0">No results — try fewer filters or different notes.</p>';
+    document.getElementById('results').style.display = 'block';
+    return;
+  }
+
+  results.forEach((p, i) => {
+    const card = document.createElement('a');
+    card.className = 'card';
+    const hasUrl = p.url && p.url !== 'nan';
+    card.href   = hasUrl ? p.url : '#';
+    if (hasUrl) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
+    card.style.animationDelay = `${i * .07}s`;
+
+    const tierHtml = (label, notes) => !notes.length ? '' : `
+      <div class="note-tier">
+        <div class="tier-l">${label}</div>
+        <div class="note-list">${notes.map(n =>
+          `<span class="${p.matched_notes.includes(n)?'hit':''}">${n}</span>`
+        ).join(', ')}</div>
+      </div>`;
+
+    const badge = p.score_pct >= 60 ? 'Strong Match' : p.score_pct >= 35 ? 'Good Match' : 'Possible Match';
+    const gIcon = {women:'♀',men:'♂',unisex:'⚥'}[p.gender]||'';
+
+    card.innerHTML = `
+      <div class="card-top">
+        <span class="card-badge">${badge}</span>
+        <span class="card-rating"><strong>★ ${p.rating}</strong> (${p.rating_count.toLocaleString()})</span>
+      </div>
+      <div class="card-name">${p.name}</div>
+      <div class="card-brand">${p.brand}${p.year?' · '+p.year:''} · ${gIcon} ${p.gender}</div>
+      ${tierHtml('Top', p.top_notes)}
+      ${tierHtml('Heart', p.mid_notes)}
+      ${tierHtml('Base', p.base_notes)}
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill" data-pct="${p.score_pct}"></div></div>
+        <div class="score-foot">
+          <span class="score-pct">${p.score_pct}% similarity</span>
+          <span class="score-revs">${p.rating_count.toLocaleString()} reviews</span>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  requestAnimationFrame(() =>
+    document.querySelectorAll('.score-fill').forEach(b => b.style.width = b.dataset.pct + '%')
+  );
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
